@@ -2,10 +2,12 @@
 
 ## HW17. Ansible. Create and destroy AWS EC2 isntance
 
-#### Copy file to remote host
+#### Playbook
 [ansible_ec2_create.yml](https://github.com/voyager1122/iba_hw17/blob/main/ansible_ec2_create.yml)
 
 ![screenshot](./ansible_ec2_create.png)
+
+#### Play output
 
 ```
 root@ip-172-31-81-185:/etc/ansible# ansible-playbook ansible_ec2_create.yml
