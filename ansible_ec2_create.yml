@@ -1,0 +1,71 @@
+---
+- name: Create and configure EC2 instance with Docker
+  hosts: localhost
+  gather_facts: no
+  vars:
+    instance_type: t3.micro
+    ami_id: "ami-0e2c8caa4b6378d8c"
+    region: us-east-1
+    key_name: devops
+    security_group: sg-04f26bcdae4d033df
+    subnet_id: subnet-051774fda132251b3
+    docker_image: "nginx:latest"
+    ansible_user: ubuntu
+    ansible_ssh_private_key_file: devops.pem
+
+
+  tasks:
+    - name: Create EC2 isntance
+      amazon.aws.ec2_instance:
+        name: ivanfan-ansbl-inst
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        region: "{{ region }}"
+        key_name: "{{ key_name }}"
+        security_group: "{{ security_group }}"
+        subnet_id: "{{ subnet_id }}"
+        wait: yes
+        tags:
+          Name: ivanfan-ansbl-inst
+      register: ec2_instance
+
+    - name: EC2 instance info
+      debug:
+        var: ec2_instance
+
+    - name: Wait for SSH to become available on the instance
+      ansible.builtin.wait_for:
+        host: "{{ ec2_instance.instances[0].public_ip_address }}"
+        port: 22
+        delay: 10  # Wait for 10 seconds before checking
+        timeout: 300  # Wait up to 5 minutes
+        state: started  # Wait until the port is open
+
+
+    - name: Install Docker on the instance
+      ansible.builtin.apt:
+        name: docker.io
+        state: present
+        update_cache: yes  # Make sure apt cache is updated before installing
+      become: yes
+      delegate_to: "{{ ec2_instance.instances[0].public_ip_address }}"
+      when: ec2_instance.instances is defined
+
+    - name: Run Docker container with nginx
+      community.docker.docker_container:
+        name: nginx_container
+        image: "{{ docker_image }}"
+        state: started
+        restart_policy: always
+        exposed_ports:
+          - "80"
+      become: yes
+      delegate_to: "{{ ec2_instance.instances[0].public_ip_address }}"
+      when: ec2_instance.instances is defined
+
+    - name: Stop and delete instance
+      amazon.aws.ec2_instance:
+        instance_ids: "{{ ec2_instance.instance_ids[0] }}"
+        region: "{{ region }}"
+        state: absent
+      when: ec2_instance.instances is defined
